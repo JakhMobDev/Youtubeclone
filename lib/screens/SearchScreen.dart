@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:f1/models/AppData.dart';
 import 'package:f1/widgets/VideoCard.dart';
+import 'package:f1/services/YoutubeService.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -11,25 +12,58 @@ class SearchScreen extends StatefulWidget {
 
 class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _controller = TextEditingController();
+  final YoutubeService _service = YoutubeService();
+
   String _query = '';
+  List<VideoModel> _results = [];
+  bool _isLoading = false;
   bool _searched = false;
 
   final List<String> _suggestions = [
-    'Nasheed',
-    'DIY videos',
-    'Nature 4K',
-    'Relaxing music',
-    'Islamic reminders',
+    'Ulug\'bek Rahmatullayev',
+    'Yulduz Usmonova',
+    'Jahongir Otajonov',
+    'Sevinch Mo\'minova',
+    'Shaxriyor',
+    'Zoff Music',
+    'O\'zbek musiqa 2024',
+    'Konsert 2024',
   ];
 
   @override
-  Widget build(BuildContext context) {
-    final results = AppData.videos
-        .where((v) => v.title.toLowerCase().contains(_query.toLowerCase()) ||
-        v.channel.toLowerCase().contains(_query.toLowerCase()))
-        .toList();
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
+  Future<void> _search(String query) async {
+    if (query.trim().isEmpty) return;
+    setState(() {
+      _isLoading = true;
+      _searched = true;
+      _query = query;
+    });
+
+    try {
+      final results = await _service.getVideos(query);
+      if (!mounted) return;
+      setState(() {
+        _results = results;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _results = [];
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: true, // ✅ klaviatura ochilganda UI siqiladi
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
@@ -41,10 +75,16 @@ class _SearchScreenState extends State<SearchScreen> {
         title: TextField(
           controller: _controller,
           autofocus: true,
-          onChanged: (v) => setState(() => _query = v),
-          onSubmitted: (v) => setState(() => _searched = true),
+          onChanged: (v) => setState(() {
+            _query = v;
+            if (v.isEmpty) {
+              _searched = false;
+              _results = [];
+            }
+          }),
+          onSubmitted: (v) => _search(v),
           decoration: InputDecoration(
-            hintText: 'Search YouTube',
+            hintText: 'Qidiring...',
             hintStyle: TextStyle(color: Colors.grey[400], fontSize: 15),
             border: InputBorder.none,
           ),
@@ -58,67 +98,88 @@ class _SearchScreenState extends State<SearchScreen> {
                 _controller.clear();
                 _query = '';
                 _searched = false;
+                _results = [];
               }),
             ),
           IconButton(
-            icon: const Icon(Icons.mic, color: Colors.black),
-            onPressed: () {},
+            icon: const Icon(Icons.search, color: Colors.black),
+            onPressed: () => _search(_controller.text),
           ),
         ],
       ),
-      body: _query.isEmpty
+      body: _isLoading
+          ? const Center(
+          child: CircularProgressIndicator(color: Colors.red))
+          : !_searched
           ? _buildSuggestions()
-          : _buildResults(results),
+          : _buildResults(),
     );
   }
 
+  // ✅ Column o'rniga ListView — klaviatura ochilganda overflow bo'lmaydi
   Widget _buildSuggestions() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return ListView(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-          child: Text('Recent searches',
-              style: TextStyle(color: Colors.grey[600], fontSize: 13, fontWeight: FontWeight.w600)),
+          child: Text(
+            'Mashhur qidiruvlar',
+            style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 13,
+                fontWeight: FontWeight.w600),
+          ),
         ),
         ..._suggestions.map((s) => ListTile(
-          leading: const Icon(Icons.history, color: Colors.grey, size: 20),
+          leading: const Icon(Icons.trending_up,
+              color: Colors.red, size: 20),
           title: Text(s, style: const TextStyle(fontSize: 14)),
-          trailing: const Icon(Icons.north_west, color: Colors.grey, size: 16),
-          onTap: () => setState(() {
+          trailing: const Icon(Icons.north_west,
+              color: Colors.grey, size: 16),
+          onTap: () {
             _controller.text = s;
-            _query = s;
-            _searched = true;
-          }),
+            _search(s);
+          },
         )),
       ],
     );
   }
 
-  Widget _buildResults(List<VideoModel> results) {
-    if (results.isEmpty) {
+  Widget _buildResults() {
+    if (_results.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(Icons.search_off, color: Colors.grey[400], size: 64),
             const SizedBox(height: 12),
-            Text('No results found',
-                style: TextStyle(color: Colors.grey[600], fontSize: 15)),
-            Text('Try different keywords',
-                style: TextStyle(color: Colors.grey[400], fontSize: 13)),
+            Text(
+              '"$_query" bo\'yicha natija topilmadi',
+              style: TextStyle(color: Colors.grey[600], fontSize: 15),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Boshqa kalit so\'z kiriting',
+              style: TextStyle(color: Colors.grey[400], fontSize: 13),
+            ),
           ],
         ),
       );
     }
+
     return ListView(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-          child: Text('${results.length} results',
-              style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+          child: Text(
+            '${_results.length} ta natija',
+            style: TextStyle(color: Colors.grey[600], fontSize: 12),
+          ),
         ),
-        ...results.map((v) => HorizontalVideoCard(video: v)),
+        ..._results.map((v) => HorizontalVideoCard(video: v)),
       ],
     );
   }

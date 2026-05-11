@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:f1/models/AppData.dart';
 import 'package:f1/widgets/VideoCard.dart';
 import 'package:f1/widgets/YouTubeTopBar.dart';
-import 'package:f1/screens/VideoPlayerScreen.dart';
+import 'package:f1/screens/ShortsScreen.dart';
 import 'package:f1/services/YoutubeService.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -14,34 +14,42 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   String _selectedChip = 'All';
-  final List<String> _chips = ['All', 'Mixes', 'Music', 'Graphic', 'Gaming', 'News', 'Live'];
+
+  final List<String> _chips = [
+    'All', 'Musiqa', 'Konsert', 'Klip', 'Live', 'Podcast', 'Yangi'
+  ];
 
   final YoutubeService _service = YoutubeService();
-  List<VideoModel> _videos = [];
-  bool _isLoading = true;
-  String? _error;
+
+  List<VideoModel> _videos = List.from(AppData.videos);
+  List<VideoModel> _shorts = List.from(AppData.shorts);
+  bool _isLoading = false;
+  bool _isShortsLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _loadVideos();
+    _loadData();
   }
 
-  Future<void> _loadVideos() async {
-    try {
-      final videos = await _service.getVideos('trending');
-      setState(() {
-        _videos = videos;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _error = e.toString();
-        _isLoading = false;
-        // API ishlamasa fallback data ishlatiladi
-        _videos = AppData.videos;
-      });
-    }
+  Future<void> _loadData() async {
+    setState(() {
+      _isLoading = true;
+      _isShortsLoading = true;
+    });
+
+    final results = await Future.wait([
+      _service.getVideos('o\'zbek musiqa'),
+      _service.getShorts(query: 'o\'zbek musiqa shorts'),
+    ]);
+
+    if (!mounted) return;
+    setState(() {
+      _videos = results[0];
+      _shorts = results[1];
+      _isLoading = false;
+      _isShortsLoading = false;
+    });
   }
 
   Future<void> _onChipSelected(String chip) async {
@@ -49,18 +57,20 @@ class _HomeScreenState extends State<HomeScreen> {
       _selectedChip = chip;
       _isLoading = true;
     });
-    try {
-      final videos = await _service.getVideos(chip == 'All' ? 'trending' : chip);
-      setState(() {
-        _videos = videos;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _videos = AppData.videos;
-        _isLoading = false;
-      });
-    }
+
+    final query = chip == 'All' ? 'o\'zbek musiqa' : 'o\'zbek $chip';
+    final videos = await _service.getVideos(query);
+
+    if (!mounted) return;
+    setState(() {
+      _videos = videos;
+      _isLoading = false;
+    });
+  }
+
+  // ✅ Refresh — yangi ma'lumot yuklanadi
+  Future<void> _onRefresh() async {
+    await _loadData();
   }
 
   @override
@@ -70,7 +80,7 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: const YouTubeTopBar(showLogo: true),
       body: Column(
         children: [
-          // Chips
+          // Kategoriya tugmalari
           SizedBox(
             height: 44,
             child: ListView.builder(
@@ -85,7 +95,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: GestureDetector(
                     onTap: () => _onChipSelected(chip),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 6),
                       decoration: BoxDecoration(
                         color: isSelected ? Colors.black : Colors.grey[200],
                         borderRadius: BorderRadius.circular(20),
@@ -95,7 +106,9 @@ class _HomeScreenState extends State<HomeScreen> {
                         style: TextStyle(
                           color: isSelected ? Colors.white : Colors.black87,
                           fontSize: 13,
-                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                          fontWeight: isSelected
+                              ? FontWeight.w600
+                              : FontWeight.normal,
                         ),
                       ),
                     ),
@@ -105,16 +118,18 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
 
-          // Body
+          // Videolar ro'yxati
           Expanded(
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator(color: Colors.red))
+                ? const Center(
+                child: CircularProgressIndicator(color: Colors.red))
                 : RefreshIndicator(
               color: Colors.red,
-              onRefresh: _loadVideos,
+              onRefresh: _onRefresh,
               child: ListView(
                 children: [
-                  if (_videos.isNotEmpty) VideoCard(video: _videos[0]),
+                  if (_videos.isNotEmpty)
+                    VideoCard(video: _videos[0]),
                   _buildShortsSection(),
                   ..._videos.skip(1).map((v) => VideoCard(video: v)),
                 ],
@@ -127,60 +142,56 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildShortsSection() {
+    if (_shorts.isEmpty) return const SizedBox.shrink();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 16, 12, 10),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.red,
-                  borderRadius: BorderRadius.circular(6),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.red,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.bolt, color: Colors.white, size: 15),
+                SizedBox(width: 2),
+                Text(
+                  'Shorts',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13),
                 ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.bolt, color: Colors.white, size: 15),
-                    SizedBox(width: 2),
-                    Text('Shorts',
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13)),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.grey[200],
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text('BETA',
-                    style: TextStyle(
-                        color: Colors.grey[700],
-                        fontSize: 9,
-                        fontWeight: FontWeight.w700)),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
+
         SizedBox(
           height: 230,
-          child: ListView.builder(
+          child: _isShortsLoading
+              ? const Center(
+              child: CircularProgressIndicator(color: Colors.red))
+              : ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 12),
-            itemCount: AppData.shorts.length,
+            itemCount: _shorts.length,
             itemBuilder: (context, index) {
-              final s = AppData.shorts[index];
+              final s = _shorts[index];
               return GestureDetector(
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
-                      builder: (_) => VideoPlayerScreen(video: s, isShort: true)),
+                    builder: (_) => ShortsScreen(
+                      startIndex: index,
+                      initialShorts: _shorts,
+                    ),
+                  ),
                 ),
                 child: Container(
                   width: 130,
@@ -189,52 +200,124 @@ class _HomeScreenState extends State<HomeScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(10),
-                              // URL bilan rasm, yo'q bo'lsa rang
-                              child: s.thumbnail.startsWith('http')
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              s.thumbnail.startsWith('http')
                                   ? Image.network(
                                 s.thumbnail,
                                 fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => Container(
-                                  color: Colors.grey[300],
-                                  child: const Icon(Icons.play_circle_outline,
-                                      color: Colors.white70, size: 40),
-                                ),
+                                loadingBuilder:
+                                    (_, child, progress) {
+                                  if (progress == null)
+                                    return child;
+                                  return Container(
+                                    color: Colors.grey[300],
+                                    child: const Center(
+                                      child:
+                                      CircularProgressIndicator(
+                                        color: Colors.red,
+                                        strokeWidth: 2,
+                                      ),
+                                    ),
+                                  );
+                                },
+                                errorBuilder: (_, __, ___) =>
+                                    Container(
+                                      color: Colors.grey[300],
+                                      child: const Icon(
+                                        Icons.play_circle_outline,
+                                        color: Colors.white70,
+                                        size: 40,
+                                      ),
+                                    ),
                               )
                                   : Container(
                                 color: Colors.grey[300],
                                 child: const Center(
-                                  child: Icon(Icons.play_circle_outline,
-                                      color: Colors.white70, size: 40),
+                                  child: Icon(
+                                    Icons.play_circle_outline,
+                                    color: Colors.white70,
+                                    size: 40,
+                                  ),
                                 ),
                               ),
-                            ),
-                            Positioned(
-                              bottom: 8,
-                              left: 8,
-                              right: 24,
-                              child: Text(
-                                s.title,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  shadows: [Shadow(color: Colors.black54, blurRadius: 4)],
+
+                              // Play overlay
+                              Center(
+                                child: Container(
+                                  width: 44,
+                                  height: 44,
+                                  decoration: BoxDecoration(
+                                    color:
+                                    Colors.black.withOpacity(0.55),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.play_arrow_rounded,
+                                    color: Colors.white,
+                                    size: 28,
+                                  ),
                                 ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
                               ),
-                            ),
-                          ],
+
+                              // Davomiylik
+                              if (s.duration.isNotEmpty)
+                                Positioned(
+                                  bottom: 30,
+                                  right: 6,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 4, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black87,
+                                      borderRadius:
+                                      BorderRadius.circular(3),
+                                    ),
+                                    child: Text(
+                                      s.duration,
+                                      style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 9),
+                                    ),
+                                  ),
+                                ),
+
+                              // Sarlavha
+                              Positioned(
+                                bottom: 8,
+                                left: 8,
+                                right: 8,
+                                child: Text(
+                                  s.title,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    shadows: [
+                                      Shadow(
+                                          color: Colors.black54,
+                                          blurRadius: 4)
+                                    ],
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                       const SizedBox(height: 4),
-                      Text(s.views,
-                          style: TextStyle(color: Colors.grey[600], fontSize: 11)),
+                      Text(
+                        s.views.isNotEmpty ? s.views : s.channel,
+                        style: TextStyle(
+                            color: Colors.grey[600], fontSize: 11),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ],
                   ),
                 ),

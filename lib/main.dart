@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import 'screens/HomeScreen.dart';
-import 'screens/ShortsScreen.dart';
-import 'screens/SubscriptionsScreen.dart';
-import 'screens/LibraryScreen.dart';
-
+import 'package:f1/screens/HomeScreen.dart';
+import 'package:f1/screens/ShortsScreen.dart';
+import 'package:f1/screens/SubscriptionsScreen.dart';
+import 'package:f1/screens/LibraryScreen.dart';
 
 void main() {
   runApp(const YouTubeApp());
@@ -38,12 +37,13 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
 
-  final List<Widget> _screens = const [
-    HomeScreen(),
-    ShortsScreen(),
-    SizedBox(),
-    SubscriptionsScreen(),
-    LibraryScreen(),
+  // Shorts yo'q — faqat bosilganda Navigator orqali ochiladi
+  final List<Widget> _screens = [
+    const HomeScreen(),
+    const SizedBox(),
+    const SizedBox(),
+    const SubscriptionsScreen(),
+    const LibraryScreen(),
   ];
 
   void _showUploadSheet() {
@@ -75,8 +75,17 @@ class _MainScreenState extends State<MainScreen> {
       child: BottomNavigationBar(
         currentIndex: _selectedIndex == 2 ? 0 : _selectedIndex,
         onTap: (i) {
+          // + tugmasi
           if (i == 2) {
             _showUploadSheet();
+            return;
+          }
+          // Shorts — Navigator orqali ochiladi
+          if (i == 1) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ShortsScreen()),
+            );
             return;
           }
           setState(() => _selectedIndex = i);
@@ -88,14 +97,17 @@ class _MainScreenState extends State<MainScreen> {
         unselectedFontSize: 10,
         backgroundColor: Colors.white,
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.bolt), label: 'Shorts'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.home), label: 'Home'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.bolt), label: 'Shorts'),
           BottomNavigationBarItem(
             icon: Icon(Icons.add_circle_outline, size: 36),
             label: '',
           ),
           BottomNavigationBarItem(
-              icon: Icon(Icons.subscriptions_outlined), label: 'Subscriptions'),
+              icon: Icon(Icons.subscriptions_outlined),
+              label: 'Subscriptions'),
           BottomNavigationBarItem(
               icon: Icon(Icons.video_library_outlined), label: 'Library'),
         ],
@@ -174,7 +186,8 @@ class _UploadBottomSheetState extends State<UploadBottomSheet> {
             ),
             backgroundColor: Colors.green[700],
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12)),
           ),
         );
       });
@@ -209,7 +222,8 @@ class _UploadBottomSheetState extends State<UploadBottomSheet> {
               children: [
                 const Text(
                   'Kontent yaratish',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 const Spacer(),
                 GestureDetector(
@@ -220,7 +234,8 @@ class _UploadBottomSheetState extends State<UploadBottomSheet> {
                       color: Colors.grey[100],
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.close, size: 18, color: Colors.black54),
+                    child: const Icon(Icons.close,
+                        size: 18, color: Colors.black54),
                   ),
                 ),
               ],
@@ -230,7 +245,8 @@ class _UploadBottomSheetState extends State<UploadBottomSheet> {
           // Upload progress
           if (_uploading)
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
@@ -261,7 +277,8 @@ class _UploadBottomSheetState extends State<UploadBottomSheet> {
                               Text(
                                 _selectedFile ?? '',
                                 style: const TextStyle(
-                                    fontWeight: FontWeight.w600, fontSize: 13),
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13),
                               ),
                               Text(
                                 _progress < 1.0
@@ -302,13 +319,14 @@ class _UploadBottomSheetState extends State<UploadBottomSheet> {
           // Options
           if (!_uploading)
             ..._options.map((opt) => ListTile(
-              contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16, vertical: 4),
               leading: Container(
                 width: 50,
                 height: 50,
                 decoration: BoxDecoration(
-                  color: (opt['color'] as Color).withOpacity(0.12),
+                  color:
+                  (opt['color'] as Color).withOpacity(0.12),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Icon(opt['icon'] as IconData,
@@ -321,10 +339,11 @@ class _UploadBottomSheetState extends State<UploadBottomSheet> {
               ),
               subtitle: Text(
                 opt['subtitle'] as String,
-                style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                style: TextStyle(
+                    color: Colors.grey[500], fontSize: 12),
               ),
-              trailing:
-              const Icon(Icons.chevron_right, color: Colors.grey),
+              trailing: const Icon(Icons.chevron_right,
+                  color: Colors.grey),
               onTap: () {
                 if (opt['title'] == 'Videoni yuklash') {
                   _simulateUpload();
@@ -332,7 +351,7 @@ class _UploadBottomSheetState extends State<UploadBottomSheet> {
               },
             )),
 
-          // Bekor qilish tugmasi
+          // Bekor qilish
           if (_uploading && _progress < 1.0)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
