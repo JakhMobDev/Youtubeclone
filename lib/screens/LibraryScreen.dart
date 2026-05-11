@@ -5,131 +5,384 @@ import 'package:f1/widgets/YouTubeTopBar.dart';
 import 'package:f1/screens/HistoryScreen.dart';
 import 'package:f1/screens/DownloadsScreen.dart';
 
+/// LibraryScreen
+/// YouTube Library sahifasi
+/// Playlistlar, History, Downloads va Recently Watched qismlarini chiqaradi
 class LibraryScreen extends StatelessWidget {
+
+  /// Constructor
   const LibraryScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+
     return Scaffold(
+
+      /// Sahifa orqa fon rangi
       backgroundColor: Colors.white,
-      appBar: const YouTubeTopBar(title: 'Library', showLogo: false),
+
+      /// Custom AppBar
+      appBar: const YouTubeTopBar(
+        title: 'Library',
+        showLogo: false,
+      ),
+
+      /// Body qismi
       body: ListView(
         children: [
-          // Quick access
+
+          // ───────────────── QUICK ACCESS ─────────────────
+
+          /// Tez kirish tugmalari
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Row(
-              children: [
-                _quickTile(context, Icons.history, 'History', const HistoryScreen()),
-                const SizedBox(width: 12),
-                _quickTile(context, Icons.inbox_outlined, 'Your inbox', null),
-                const SizedBox(width: 12),
-                _quickTile(context, Icons.watch_later_outlined, 'Watch later', null),
-                const SizedBox(width: 12),
-                _quickTile(context, Icons.download_outlined, 'Downloads', const DownloadsScreen()),
-              ],
+            padding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 8,
             ),
-          ),
-          Divider(height: 1, color: Colors.grey.shade200),
-          // Playlists
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 16, 12, 8),
+
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Playlists',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                TextButton(
-                  onPressed: () {},
-                  child: const Text('Recently added',
-                      style: TextStyle(color: Colors.grey, fontSize: 12)),
+
+                /// History tugmasi
+                _quickTile(
+                  context,
+                  Icons.history,
+                  'History',
+                  const HistoryScreen(),
+                ),
+
+                const SizedBox(width: 12),
+
+                /// Inbox tugmasi
+                _quickTile(
+                  context,
+                  Icons.inbox_outlined,
+                  'Your inbox',
+                  null,
+                ),
+
+                const SizedBox(width: 12),
+
+                /// Watch later tugmasi
+                _quickTile(
+                  context,
+                  Icons.watch_later_outlined,
+                  'Watch later',
+                  null,
+                ),
+
+                const SizedBox(width: 12),
+
+                /// Downloads tugmasi
+                _quickTile(
+                  context,
+                  Icons.download_outlined,
+                  'Downloads',
+                  const DownloadsScreen(),
                 ),
               ],
             ),
           ),
-          // New playlist
+
+          /// Divider
+          Divider(
+            height: 1,
+            color: Colors.grey.shade200,
+          ),
+
+          // ───────────────── PLAYLISTS TITLE ─────────────────
+
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              12,
+              16,
+              12,
+              8,
+            ),
+
+            child: Row(
+
+              /// Ikki tomonlama joylash
+              mainAxisAlignment:
+              MainAxisAlignment.spaceBetween,
+
+              children: [
+
+                /// Playlists title
+                const Text(
+                  'Playlists',
+
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                  ),
+                ),
+
+                /// Recently added button
+                TextButton(
+
+                  onPressed: () {},
+
+                  child: const Text(
+                    'Recently added',
+
+                    style: TextStyle(
+                      color: Colors.grey,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // ───────────────── NEW PLAYLIST ─────────────────
+
           ListTile(
+
+            /// Chapdagi icon qismi
             leading: Container(
               width: 52,
               height: 52,
+
               decoration: BoxDecoration(
                 color: Colors.grey[200],
-                borderRadius: BorderRadius.circular(4),
+
+                borderRadius:
+                BorderRadius.circular(4),
               ),
-              child: const Icon(Icons.add, color: Colors.black54),
+
+              child: const Icon(
+                Icons.add,
+                color: Colors.black54,
+              ),
             ),
-            title: const Text('New Playlist',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
-            subtitle: Text('0 videos',
-                style: TextStyle(color: Colors.grey[600], fontSize: 12)),
-            trailing: Icon(Icons.more_vert, color: Colors.grey[400]),
+
+            /// Playlist nomi
+            title: const Text(
+              'New Playlist',
+
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+
+            /// Playlist videos soni
+            subtitle: Text(
+              '0 videos',
+
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 12,
+              ),
+            ),
+
+            /// More button
+            trailing: Icon(
+              Icons.more_vert,
+              color: Colors.grey[400],
+            ),
           ),
-          // Liked videos playlist — Color o'rniga URL
+
+          // ───────────────── LIKED VIDEOS ─────────────────
+
           ListTile(
+
+            /// Thumbnail qismi
             leading: ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: AppData.videos[0].thumbnail.startsWith('http')
+
+              borderRadius:
+              BorderRadius.circular(4),
+
+              child: AppData
+                  .videos[0]
+                  .thumbnail
+                  .startsWith('http')
+
+              /// Agar URL mavjud bo‘lsa
                   ? Image.network(
-                AppData.videos[0].thumbnail,
+
+                AppData
+                    .videos[0]
+                    .thumbnail,
+
                 width: 52,
                 height: 52,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
-                  width: 52,
-                  height: 52,
-                  color: Colors.grey[300],
-                  child: const Icon(Icons.thumb_up, color: Colors.white70),
-                ),
+
+                /// Rasm yuklanmasa
+                errorBuilder:
+                    (_, __, ___) {
+
+                  return Container(
+                    width: 52,
+                    height: 52,
+                    color:
+                    Colors.grey[300],
+
+                    child: const Icon(
+                      Icons.thumb_up,
+                      color:
+                      Colors.white70,
+                    ),
+                  );
+                },
               )
+
+              /// URL bo‘lmasa
                   : Container(
                 width: 52,
                 height: 52,
                 color: Colors.grey[300],
-                child: const Icon(Icons.thumb_up, color: Colors.white70),
+
+                child: const Icon(
+                  Icons.thumb_up,
+                  color: Colors.white70,
+                ),
               ),
             ),
-            title: const Text('Liked Videos',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
-            subtitle: Text('47 videos',
-                style: TextStyle(color: Colors.grey[600], fontSize: 12)),
-            trailing: Icon(Icons.more_vert, color: Colors.grey[400]),
+
+            /// Playlist nomi
+            title: const Text(
+              'Liked Videos',
+
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+
+            /// Video soni
+            subtitle: Text(
+              '47 videos',
+
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 12,
+              ),
+            ),
+
+            /// More button
+            trailing: Icon(
+              Icons.more_vert,
+              color: Colors.grey[400],
+            ),
           ),
-          Divider(height: 1, color: Colors.grey.shade200),
-          // Recently watched
+
+          /// Divider
+          Divider(
+            height: 1,
+            color: Colors.grey.shade200,
+          ),
+
+          // ───────────────── RECENTLY WATCHED ─────────────────
+
+          /// Recently watched title
           const Padding(
-            padding: EdgeInsets.fromLTRB(12, 16, 12, 8),
-            child: Text('Recently watched',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+            padding: EdgeInsets.fromLTRB(
+              12,
+              16,
+              12,
+              8,
+            ),
+
+            child: Text(
+              'Recently watched',
+
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 15,
+              ),
+            ),
           ),
-          ...AppData.videos.take(3).map((v) => HorizontalVideoCard(video: v)),
+
+          /// Oxirgi ko‘rilgan videolar
+          ...AppData.videos
+
+          /// Faqat 3 ta video oladi
+              .take(3)
+
+          /// Har bir video uchun card yaratadi
+              .map(
+                (v) =>
+                HorizontalVideoCard(
+                  video: v,
+                ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _quickTile(BuildContext context, IconData icon, String label, Widget? screen) {
+  /// Quick access button widget
+  ///
+  /// icon  -> icon turi
+  /// label -> text
+  /// screen -> ochiladigan screen
+  Widget _quickTile(
+      BuildContext context,
+      IconData icon,
+      String label,
+      Widget? screen,
+      ) {
+
     return Expanded(
+
       child: GestureDetector(
+
+        /// Screen mavjud bo‘lsa ochadi
         onTap: screen != null
+
             ? () => Navigator.push(
-            context, MaterialPageRoute(builder: (_) => screen))
+
+          context,
+
+          MaterialPageRoute(
+            builder: (_) => screen,
+          ),
+        )
+
             : null,
+
         child: Column(
           children: [
+
+            // ───────────────── ICON BOX ─────────────────
+
             Container(
               width: 56,
               height: 56,
+
               decoration: BoxDecoration(
                 color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(12),
+
+                borderRadius:
+                BorderRadius.circular(12),
               ),
-              child: Icon(icon, color: Colors.black87, size: 26),
+
+              child: Icon(
+                icon,
+                color: Colors.black87,
+                size: 26,
+              ),
             ),
+
             const SizedBox(height: 6),
-            Text(label,
-                style: const TextStyle(fontSize: 11),
-                textAlign: TextAlign.center,
-                maxLines: 2),
+
+            // ───────────────── LABEL ─────────────────
+
+            Text(
+              label,
+
+              style: const TextStyle(
+                fontSize: 11,
+              ),
+
+              textAlign: TextAlign.center,
+
+              maxLines: 2,
+            ),
           ],
         ),
       ),

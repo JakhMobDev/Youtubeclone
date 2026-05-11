@@ -3,23 +3,47 @@ import 'package:f1/models/AppData.dart';
 import 'package:f1/widgets/VideoCard.dart';
 import 'package:f1/services/YoutubeService.dart';
 
+/// SearchScreen
+/// YouTube qidiruv sahifasi
+/// Video qidirish va natijalarni ko‘rsatish uchun ishlatiladi
 class SearchScreen extends StatefulWidget {
+
+  /// Constructor
   const SearchScreen({super.key});
 
   @override
-  State<SearchScreen> createState() => _SearchScreenState();
+  State<SearchScreen> createState() =>
+      _SearchScreenState();
 }
 
-class _SearchScreenState extends State<SearchScreen> {
-  final TextEditingController _controller = TextEditingController();
-  final YoutubeService _service = YoutubeService();
+/// SearchScreen state qismi
+class _SearchScreenState
+    extends State<SearchScreen> {
 
+  /// Search field controller
+  /// TextField ichidagi textni boshqaradi
+  final TextEditingController _controller =
+  TextEditingController();
+
+  /// YouTube API service
+  final YoutubeService _service =
+  YoutubeService();
+
+  /// Hozirgi qidiruv texti
   String _query = '';
+
+  /// Search natijalari
   List<VideoModel> _results = [];
+
+  /// Loading holati
   bool _isLoading = false;
+
+  /// Search qilingan yoki yo‘qligi
   bool _searched = false;
 
+  /// Tavsiya qilingan qidiruvlar
   final List<String> _suggestions = [
+
     'Ulug\'bek Rahmatullayev',
     'Yulduz Usmonova',
     'Jahongir Otajonov',
@@ -32,12 +56,20 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   void dispose() {
+
+    /// Controller ni xotiradan tozalaydi
     _controller.dispose();
+
     super.dispose();
   }
 
+  /// Video qidirish funksiyasi
   Future<void> _search(String query) async {
+
+    /// Agar text bo‘sh bo‘lsa ishlamaydi
     if (query.trim().isEmpty) return;
+
+    /// Loading holatini yoqadi
     setState(() {
       _isLoading = true;
       _searched = true;
@@ -45,14 +77,25 @@ class _SearchScreenState extends State<SearchScreen> {
     });
 
     try {
-      final results = await _service.getVideos(query);
+
+      /// API orqali videolarni oladi
+      final results =
+      await _service.getVideos(query);
+
+      /// Widget mavjudligini tekshiradi
       if (!mounted) return;
+
+      /// UI ni yangilaydi
       setState(() {
         _results = results;
         _isLoading = false;
       });
+
     } catch (e) {
+
+      /// Xatolik bo‘lsa
       if (!mounted) return;
+
       setState(() {
         _results = [];
         _isLoading = false;
@@ -62,124 +105,309 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   Widget build(BuildContext context) {
+
     return Scaffold(
-      resizeToAvoidBottomInset: true, // ✅ klaviatura ochilganda UI siqiladi
+
+      /// Keyboard ochilganda UI siqiladi
+      resizeToAvoidBottomInset: true,
+
+      /// Orqa fon rangi
       backgroundColor: Colors.white,
+
+      // ───────────────── APP BAR ─────────────────
+
       appBar: AppBar(
+
         backgroundColor: Colors.white,
         elevation: 0,
+
+        /// Orqaga qaytish tugmasi
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
+
+          icon: const Icon(
+            Icons.arrow_back,
+            color: Colors.black,
+          ),
+
+          onPressed: () =>
+              Navigator.pop(context),
         ),
+
+        // ───────────────── SEARCH FIELD ─────────────────
+
         title: TextField(
+
           controller: _controller,
+
+          /// Sahifa ochilganda keyboard ochiladi
           autofocus: true,
+
+          /// Text o‘zgarganda ishlaydi
           onChanged: (v) => setState(() {
+
             _query = v;
+
+            /// Agar text o‘chirib tashlansa
             if (v.isEmpty) {
               _searched = false;
               _results = [];
             }
           }),
+
+          /// Keyboard search bosilganda
           onSubmitted: (v) => _search(v),
+
           decoration: InputDecoration(
+
+            /// Placeholder
             hintText: 'Qidiring...',
-            hintStyle: TextStyle(color: Colors.grey[400], fontSize: 15),
+
+            /// Placeholder style
+            hintStyle: TextStyle(
+              color: Colors.grey[400],
+              fontSize: 15,
+            ),
+
+            /// Borderni olib tashlaydi
             border: InputBorder.none,
           ),
-          style: const TextStyle(fontSize: 15),
+
+          style: const TextStyle(
+            fontSize: 15,
+          ),
         ),
+
+        // ───────────────── ACTION BUTTONS ─────────────────
+
         actions: [
+
+          /// Agar text mavjud bo‘lsa clear button chiqadi
           if (_query.isNotEmpty)
+
             IconButton(
-              icon: const Icon(Icons.clear, color: Colors.black),
+
+              icon: const Icon(
+                Icons.clear,
+                color: Colors.black,
+              ),
+
+              /// Search ni tozalaydi
               onPressed: () => setState(() {
+
                 _controller.clear();
+
                 _query = '';
                 _searched = false;
                 _results = [];
               }),
             ),
+
+          /// Search button
           IconButton(
-            icon: const Icon(Icons.search, color: Colors.black),
-            onPressed: () => _search(_controller.text),
+
+            icon: const Icon(
+              Icons.search,
+              color: Colors.black,
+            ),
+
+            /// Search funksiyasini ishga tushiradi
+            onPressed: () =>
+                _search(_controller.text),
           ),
         ],
       ),
-      body: _isLoading
+
+      // ───────────────── BODY ─────────────────
+
+      body:
+
+      /// Loading bo‘lsa spinner
+      _isLoading
+
           ? const Center(
-          child: CircularProgressIndicator(color: Colors.red))
+        child:
+        CircularProgressIndicator(
+          color: Colors.red,
+        ),
+      )
+
+      /// Search qilinmagan bo‘lsa suggestions
           : !_searched
+
           ? _buildSuggestions()
+
+      /// Natijalar
           : _buildResults(),
     );
   }
 
-  // ✅ Column o'rniga ListView — klaviatura ochilganda overflow bo'lmaydi
+  // ───────────────── SUGGESTIONS ─────────────────
+
+  /// Tavsiya qilingan qidiruvlar
   Widget _buildSuggestions() {
+
     return ListView(
-      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+
+      /// Scroll qilinganda keyboard yopiladi
+      keyboardDismissBehavior:
+      ScrollViewKeyboardDismissBehavior
+          .onDrag,
+
       children: [
+
+        /// Section title
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          padding: const EdgeInsets.fromLTRB(
+            16,
+            12,
+            16,
+            8,
+          ),
+
           child: Text(
             'Mashhur qidiruvlar',
+
             style: TextStyle(
-                color: Colors.grey[600],
-                fontSize: 13,
-                fontWeight: FontWeight.w600),
+              color: Colors.grey[600],
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
-        ..._suggestions.map((s) => ListTile(
-          leading: const Icon(Icons.trending_up,
-              color: Colors.red, size: 20),
-          title: Text(s, style: const TextStyle(fontSize: 14)),
-          trailing: const Icon(Icons.north_west,
-              color: Colors.grey, size: 16),
-          onTap: () {
-            _controller.text = s;
-            _search(s);
-          },
-        )),
+
+        // ───────────────── SUGGESTION ITEMS ─────────────────
+
+        ..._suggestions.map(
+
+              (s) => ListTile(
+
+            /// Chap icon
+            leading: const Icon(
+              Icons.trending_up,
+              color: Colors.red,
+              size: 20,
+            ),
+
+            /// Suggestion text
+            title: Text(
+              s,
+              style: const TextStyle(
+                fontSize: 14,
+              ),
+            ),
+
+            /// O‘ng icon
+            trailing: const Icon(
+              Icons.north_west,
+              color: Colors.grey,
+              size: 16,
+            ),
+
+            /// Suggestion bosilganda
+            onTap: () {
+
+              /// TextField ga yozadi
+              _controller.text = s;
+
+              /// Search qiladi
+              _search(s);
+            },
+          ),
+        ),
       ],
     );
   }
 
+  // ───────────────── SEARCH RESULTS ─────────────────
+
+  /// Search natijalari
   Widget _buildResults() {
+
+    /// Natija topilmasa
     if (_results.isEmpty) {
+
       return Center(
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+
+          mainAxisAlignment:
+          MainAxisAlignment.center,
+
           children: [
-            Icon(Icons.search_off, color: Colors.grey[400], size: 64),
+
+            /// Search off icon
+            Icon(
+              Icons.search_off,
+              color: Colors.grey[400],
+              size: 64,
+            ),
+
             const SizedBox(height: 12),
+
+            /// Result topilmadi text
             Text(
               '"$_query" bo\'yicha natija topilmadi',
-              style: TextStyle(color: Colors.grey[600], fontSize: 15),
+
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 15,
+              ),
+
               textAlign: TextAlign.center,
             ),
+
             const SizedBox(height: 4),
+
+            /// Hint text
             Text(
               'Boshqa kalit so\'z kiriting',
-              style: TextStyle(color: Colors.grey[400], fontSize: 13),
+
+              style: TextStyle(
+                color: Colors.grey[400],
+                fontSize: 13,
+              ),
             ),
           ],
         ),
       );
     }
 
+    // ───────────────── RESULTS LIST ─────────────────
+
     return ListView(
-      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+
+      /// Scroll qilinganda keyboard yopiladi
+      keyboardDismissBehavior:
+      ScrollViewKeyboardDismissBehavior
+          .onDrag,
+
       children: [
+
+        /// Result count
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          padding: const EdgeInsets.fromLTRB(
+            16,
+            12,
+            16,
+            4,
+          ),
+
           child: Text(
             '${_results.length} ta natija',
-            style: TextStyle(color: Colors.grey[600], fontSize: 12),
+
+            style: TextStyle(
+              color: Colors.grey[600],
+              fontSize: 12,
+            ),
           ),
         ),
-        ..._results.map((v) => HorizontalVideoCard(video: v)),
+
+        /// Natijalarni chiqaradi
+        ..._results.map(
+
+              (v) => HorizontalVideoCard(
+            video: v,
+          ),
+        ),
       ],
     );
   }
