@@ -37,6 +37,8 @@ dependencies:
   http: ^1.2.0
   cached_network_image: ^3.3.1
   youtube_player_flutter: ^9.1.1
+  shared_preferences: ^2.2.2  # ← qo'shing
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -3,6 +3,7 @@ import 'package:f1/screens/HomeScreen.dart';
 import 'package:f1/screens/ShortsScreen.dart';
 import 'package:f1/screens/SubscriptionsScreen.dart';
 import 'package:f1/screens/LibraryScreen.dart';
+import 'package:f1/models/AppData.dart';
 
 void main() {
   runApp(const YouTubeApp());
@@ -35,16 +36,14 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
+  /// Hozir tanlangan tab indeksi
   int _selectedIndex = 0;
 
-  // Shorts yo'q — faqat bosilganda Navigator orqali ochiladi
-  final List<Widget> _screens = [
-    const HomeScreen(),
-    const SizedBox(),
-    const SizedBox(),
-    const SubscriptionsScreen(),
-    const LibraryScreen(),
-  ];
+  /// Shorts uchun — qaysi index bosildi
+  int _shortsStartIndex = 0;
+
+  /// Shorts uchun — qaysi ro'yxat yuborildi
+  List<VideoModel> _shortsData = List.from(AppData.shorts);
 
   void _showUploadSheet() {
     showModalBottomSheet(
@@ -55,9 +54,44 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
+  /// HomeScreen dan Shorts bosilganda chaqiriladi
+  /// index — qaysi short bosildi
+  /// shorts — barcha shorts ro'yxati
+  void _onShortsTab(int index, List<VideoModel> shorts) {
+    setState(() {
+      _shortsStartIndex = index;   // bosilgan short indeksi
+      _shortsData = shorts;         // shorts ro'yxati
+      _selectedIndex = 1;           // Shorts tabiga o'tadi
+    });
+  }
+
+  /// Ekranlar ro'yxati
+  /// _selectedIndex ga qarab ko'rsatiladi
+  List<Widget> get _screens => [
+    // 0 — Home
+    HomeScreen(
+      /// Shorts bosilganda bu callback chaqiriladi
+      onShortsTab: _onShortsTab,
+    ),
+    // 1 — Shorts
+    ShortsScreen(
+      /// HomeScreen dan bosilgan short dan boshlanadi
+      startIndex: _shortsStartIndex,
+      /// HomeScreen dan kelgan shorts ro'yxati
+      initialShorts: _shortsData,
+    ),
+    // 2 — + tugmasi (ekran emas)
+    const SizedBox(),
+    // 3 — Subscriptions
+    const SubscriptionsScreen(),
+    // 4 — Library
+    const LibraryScreen(),
+  ];
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      /// _screens getter — har safar yangi ShortsScreen yaratadi
       body: IndexedStack(
         index: _selectedIndex == 2 ? 0 : _selectedIndex,
         children: _screens,
@@ -69,25 +103,19 @@ class _MainScreenState extends State<MainScreen> {
   Widget _buildBottomNav() {
     return Container(
       decoration: BoxDecoration(
-        border: Border(top: BorderSide(color: Colors.grey.shade200, width: 1)),
+        border: Border(
+            top: BorderSide(color: Colors.grey.shade200, width: 1)),
         color: Colors.white,
       ),
       child: BottomNavigationBar(
         currentIndex: _selectedIndex == 2 ? 0 : _selectedIndex,
         onTap: (i) {
-          // + tugmasi
+          /// + tugmasi — sheet ochadi
           if (i == 2) {
             _showUploadSheet();
             return;
           }
-          // Shorts — Navigator orqali ochiladi
-          if (i == 1) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const ShortsScreen()),
-            );
-            return;
-          }
+          /// Boshqa tablar
           setState(() => _selectedIndex = i);
         },
         type: BottomNavigationBarType.fixed,
@@ -109,14 +137,17 @@ class _MainScreenState extends State<MainScreen> {
               icon: Icon(Icons.subscriptions_outlined),
               label: 'Subscriptions'),
           BottomNavigationBarItem(
-              icon: Icon(Icons.video_library_outlined), label: 'Library'),
+              icon: Icon(Icons.video_library_outlined),
+              label: 'Library'),
         ],
       ),
     );
   }
 }
 
-// ─── Upload Bottom Sheet ───────────────────────────────────────────────────
+// ═══════════════════════════════════════════
+//         UPLOAD BOTTOM SHEET
+// ═══════════════════════════════════════════
 
 class UploadBottomSheet extends StatefulWidget {
   const UploadBottomSheet({super.key});
@@ -126,10 +157,16 @@ class UploadBottomSheet extends StatefulWidget {
 }
 
 class _UploadBottomSheetState extends State<UploadBottomSheet> {
+  /// Yuklash jarayoni boshlandimi
   bool _uploading = false;
+
+  /// Yuklash foizi
   double _progress = 0.0;
+
+  /// Tanlangan fayl nomi
   String? _selectedFile;
 
+  /// Yuklash variantlari
   final List<Map<String, dynamic>> _options = [
     {
       'icon': Icons.video_library_outlined,
@@ -157,6 +194,7 @@ class _UploadBottomSheetState extends State<UploadBottomSheet> {
     },
   ];
 
+  /// Yuklashni simulatsiya qiladi
   void _simulateUpload() {
     setState(() {
       _uploading = true;
@@ -164,6 +202,7 @@ class _UploadBottomSheetState extends State<UploadBottomSheet> {
       _progress = 0;
     });
 
+    /// Har 120ms da 3% qo'shadi
     Future.doWhile(() async {
       await Future.delayed(const Duration(milliseconds: 120));
       if (!mounted) return false;
@@ -172,6 +211,8 @@ class _UploadBottomSheetState extends State<UploadBottomSheet> {
     }).then((_) {
       if (!mounted) return;
       setState(() => _progress = 1.0);
+
+      /// 600ms kutib sheet yopiladi
       Future.delayed(const Duration(milliseconds: 600), () {
         if (!mounted) return;
         Navigator.pop(context);
@@ -205,7 +246,8 @@ class _UploadBottomSheetState extends State<UploadBottomSheet> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Handle bar
+
+          /// Tutqich chizig'i
           Container(
             margin: const EdgeInsets.only(top: 12, bottom: 8),
             width: 40,
@@ -215,7 +257,8 @@ class _UploadBottomSheetState extends State<UploadBottomSheet> {
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          // Header
+
+          /// Sarlavha va yopish tugmasi
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
             child: Row(
@@ -242,11 +285,11 @@ class _UploadBottomSheetState extends State<UploadBottomSheet> {
             ),
           ),
 
-          // Upload progress
+          /// Yuklash jarayoni
           if (_uploading)
             Padding(
-              padding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 16, vertical: 8),
               child: Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
@@ -259,6 +302,7 @@ class _UploadBottomSheetState extends State<UploadBottomSheet> {
                   children: [
                     Row(
                       children: [
+                        /// Fayl ikonasi
                         Container(
                           width: 44,
                           height: 44,
@@ -272,14 +316,17 @@ class _UploadBottomSheetState extends State<UploadBottomSheet> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                            crossAxisAlignment:
+                            CrossAxisAlignment.start,
                             children: [
+                              /// Fayl nomi
                               Text(
                                 _selectedFile ?? '',
                                 style: const TextStyle(
                                     fontWeight: FontWeight.w600,
                                     fontSize: 13),
                               ),
+                              /// Holat matni
                               Text(
                                 _progress < 1.0
                                     ? 'Yuklanmoqda...'
@@ -294,14 +341,17 @@ class _UploadBottomSheetState extends State<UploadBottomSheet> {
                             ],
                           ),
                         ),
+                        /// Foiz ko'rsatgich
                         Text(
                           '${(_progress * 100).toInt()}%',
                           style: const TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 15),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15),
                         ),
                       ],
                     ),
                     const SizedBox(height: 10),
+                    /// Progress bar
                     ClipRRect(
                       borderRadius: BorderRadius.circular(4),
                       child: LinearProgressIndicator(
@@ -316,7 +366,7 @@ class _UploadBottomSheetState extends State<UploadBottomSheet> {
               ),
             ),
 
-          // Options
+          /// Variantlar ro'yxati
           if (!_uploading)
             ..._options.map((opt) => ListTile(
               contentPadding: const EdgeInsets.symmetric(
@@ -325,8 +375,7 @@ class _UploadBottomSheetState extends State<UploadBottomSheet> {
                 width: 50,
                 height: 50,
                 decoration: BoxDecoration(
-                  color:
-                  (opt['color'] as Color).withOpacity(0.12),
+                  color: (opt['color'] as Color).withOpacity(0.12),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Icon(opt['icon'] as IconData,
@@ -351,7 +400,7 @@ class _UploadBottomSheetState extends State<UploadBottomSheet> {
               },
             )),
 
-          // Bekor qilish
+          /// Bekor qilish tugmasi
           if (_uploading && _progress < 1.0)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
