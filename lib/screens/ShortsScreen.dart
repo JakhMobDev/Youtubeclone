@@ -3,17 +3,11 @@ import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:f1/models/AppData.dart';
 
 /// ShortsScreen
-/// YouTube Shorts sahifasi
-/// Vertical scroll orqali shorts videolarni ko‘rsatadi
+/// YouTube Shorts sahifasi — to'liq tuzatilgan versiya
 class ShortsScreen extends StatefulWidget {
-
-  /// Boshlanish index
   final int startIndex;
-
-  /// Tashqaridan keladigan shorts list
   final List<VideoModel>? initialShorts;
 
-  /// Constructor
   const ShortsScreen({
     super.key,
     this.startIndex = 0,
@@ -21,263 +15,234 @@ class ShortsScreen extends StatefulWidget {
   });
 
   @override
-  State<ShortsScreen> createState() =>
-      _ShortsScreenState();
+  State<ShortsScreen> createState() => _ShortsScreenState();
 }
 
-/// ShortsScreen state qismi
-class _ShortsScreenState
-    extends State<ShortsScreen> {
+class _ShortsScreenState extends State<ShortsScreen>
+    with WidgetsBindingObserver {
 
-  /// Vertical PageView controller
   late final PageController _pageController;
-
-  /// Shorts videolar ro‘yxati
   late List<VideoModel> _shorts;
-
-  /// Hozirgi video index
   int _currentIndex = 0;
-
-  /// Like holati
   bool _isLiked = false;
 
-  /// Har bir short uchun YouTube controller
-  final Map<int, YoutubePlayerController>
-  _controllers = {};
+  /// Har bir short uchun controller
+  final Map<int, YoutubePlayerController> _controllers = {};
+
+  /// Listener reference — dispose uchun
+  final Map<int, VoidCallback> _listeners = {};
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
 
-    /// Agar tashqaridan list kelgan bo‘lsa ishlatadi
-    /// bo‘lmasa AppData dagi shorts ishlatiladi
-    _shorts =
-        widget.initialShorts ?? AppData.shorts;
+    // ✅ initialShorts bo'sh yoki null bo'lsa AppData ishlatiladi
+    _shorts = (widget.initialShorts?.isNotEmpty == true)
+        ? widget.initialShorts!
+        : AppData.shorts;
 
-    /// PageView controller
-    _pageController = PageController(
-      initialPage: widget.startIndex,
-    );
+    _currentIndex = widget.startIndex.clamp(0, _shorts.length - 1);
 
-    /// Hozirgi index
-    _currentIndex = widget.startIndex;
+    _pageController = PageController(initialPage: _currentIndex);
 
-    /// Birinchi videoni yuklaydi
-    _initController(
-      _currentIndex,
-      autoPlay: true,
-    );
+    // Widget build bo'lgandan keyin controller ishga tushadi
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initController(_currentIndex, autoPlay: true);
 
-    /// Keyingi videoni oldindan yuklaydi
-    if (_currentIndex + 1 < _shorts.length) {
-      _initController(_currentIndex + 1);
+      if (_currentIndex + 1 < _shorts.length) {
+        _initController(_currentIndex + 1);
+      }
+    });
+  }
+
+  // ───────────────── APP LIFECYCLE ─────────────────
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      _controllers[_currentIndex]?.pause();
+    } else if (state == AppLifecycleState.resumed) {
+      _controllers[_currentIndex]?.play();
     }
   }
 
-  /// Video controller yaratish
-  void _initController(
-      int index, {
-        bool autoPlay = false,
-      }) {
+  // ───────────────── CONTROLLER ─────────────────
 
-    /// Agar controller mavjud bo‘lsa qaytadi
+  void _initController(int index, {bool autoPlay = false}) {
+    // Mavjud bo'lsa qaytadi
     if (_controllers.containsKey(index)) {
+      if (autoPlay) {
+        _controllers[index]?.play();
+      }
       return;
     }
 
-    /// Hozirgi short
+    if (index < 0 || index >= _shorts.length) return;
+
     final short = _shorts[index];
 
-    /// Agar video ID mavjud bo‘lsa
-    if (short.id.isNotEmpty) {
+    // ✅ ID bo'sh bo'lsa log chiqar va skip
+    if (short.id.isEmpty) {
+      debugPrint('⚠️ Short[$index] id bo\'sh: "${short.title}"');
+      return;
+    }
 
-      /// YouTube controller yaratadi
-      final controller =
-      YoutubePlayerController(
+    debugPrint('🎬 Controller[$index] yaratildi: ${short.id}');
 
-        initialVideoId: short.id,
+    final controller = YoutubePlayerController(
+      initialVideoId: short.id,
+      flags: YoutubePlayerFlags(
+        autoPlay: false, // biz o'zimiz play qilamiz
+        mute: false,
+        loop: true,
+        hideControls: true,
+        forceHD: false,
+        enableCaption: false,
+      ),
+    );
 
-        flags: YoutubePlayerFlags(
+    // isReady bo'lguncha kutib play qiladi
+    if (autoPlay) {
+      bool hasStarted = false;
 
-          /// Auto play
-          autoPlay: autoPlay,
-
-          /// Mute
-          mute: false,
-
-          /// Loop
-          loop: true,
-
-          /// Control tugmalarini yashiradi
-          hideControls: true,
-
-          /// HD majburiy emas
-          forceHD: false,
-
-          /// Caption o‘chiq
-          enableCaption: false,
-        ),
-      );
-
-      /// Auto play yoqilgan bo‘lsa
-      if (autoPlay) {
-
-        controller.addListener(() {
-
-          /// Video tayyor bo‘lsa play qiladi
-          if (controller.value.isReady &&
-              !controller.value.isPlaying) {
-
-            controller.play();
-          }
-        });
+      void listener() {
+        if (!hasStarted && controller.value.isReady) {
+          hasStarted = true;
+          controller.play();
+          debugPrint('▶️ isReady → play() [$index]');
+        }
       }
 
-      /// Controller saqlanadi
-      _controllers[index] = controller;
+      controller.addListener(listener);
+      _listeners[index] = listener;
     }
+
+    _controllers[index] = controller;
   }
 
-  /// Page o‘zgarganda ishlaydi
-  void _onPageChanged(int index) {
+  // ───────────────── PAGE CHANGE ─────────────────
 
-    /// Eski videoni pause qiladi
+  void _onPageChanged(int index) {
+    // Eski video pause
     _controllers[_currentIndex]?.pause();
 
     setState(() {
-
-      /// Yangi index
       _currentIndex = index;
-
-      /// Like reset bo‘ladi
       _isLiked = false;
     });
 
-    /// Yangi video controller
-    _initController(
-      index,
-      autoPlay: true,
-    );
+    // Yangi controller
+    _initController(index, autoPlay: true);
 
-    /// Video play qilish
-    Future.delayed(
-      const Duration(milliseconds: 300),
-          () {
+    // Kichik delay bilan play
+    Future.delayed(const Duration(milliseconds: 200), () {
+      if (mounted) {
+        _controllers[index]?.play();
+      }
+    });
 
-        if (mounted) {
+    // Preload: keyingi va oldingi
+    if (index + 1 < _shorts.length) _initController(index + 1);
+    if (index - 1 >= 0) _initController(index - 1);
 
-          _controllers[index]?.play();
-        }
-      },
-    );
+    // Uzoq controllerlarni tozalash (xotira tejash)
+    _disposeDistantControllers(index);
+  }
 
-    /// Keyingi videoni preload qiladi
-    if (index + 1 < _shorts.length) {
-      _initController(index + 1);
+  /// 3+ page uzoqdagi controllerlarni dispose qiladi
+  void _disposeDistantControllers(int currentIndex) {
+    final toDispose = _controllers.keys
+        .where((i) => (i - currentIndex).abs() > 3)
+        .toList();
+
+    for (final i in toDispose) {
+      final listener = _listeners.remove(i);
+      if (listener != null) {
+        _controllers[i]?.removeListener(listener);
+      }
+      _controllers[i]?.dispose();
+      _controllers.remove(i);
+      debugPrint('🗑️ Controller[$i] dispose edildi');
     }
   }
 
   @override
   void dispose() {
-
-    /// Hozirgi videoni pause qiladi
+    WidgetsBinding.instance.removeObserver(this);
     _controllers[_currentIndex]?.pause();
-
-    /// Page controller dispose
     _pageController.dispose();
 
-    /// Barcha video controllerlarni tozalaydi
-    for (var c in _controllers.values) {
+    // Barcha listenerlarni olib tashlash
+    for (final entry in _listeners.entries) {
+      _controllers[entry.key]?.removeListener(entry.value);
+    }
+    _listeners.clear();
+
+    // Barcha controllerlarni dispose
+    for (final c in _controllers.values) {
       c.dispose();
     }
+    _controllers.clear();
 
     super.dispose();
   }
 
+  // ───────────────── BUILD ─────────────────
+
   @override
   Widget build(BuildContext context) {
+    final screenSize = MediaQuery.of(context).size;
 
-    /// Ekran o‘lchami
-    final screenSize =
-        MediaQuery.of(context).size;
-
-    return WillPopScope(
-
-      /// Orqaga chiqilganda video pause bo‘ladi
-      onWillPop: () async {
-
-        _controllers[_currentIndex]?.pause();
-
-        return true;
-      },
-
-      child: Scaffold(
-
+    // ✅ Shorts bo'sh bo'lsa xabar ko'rsatadi
+    if (_shorts.isEmpty) {
+      return const Scaffold(
         backgroundColor: Colors.black,
+        body: Center(
+          child: Text(
+            'Shorts topilmadi',
+            style: TextStyle(color: Colors.white),
+          ),
+        ),
+      );
+    }
 
-        // ───────────────── PAGE VIEW ─────────────────
-
+    return PopScope(
+      canPop: true,
+      onPopInvoked: (_) {
+        _controllers[_currentIndex]?.pause();
+      },
+      child: Scaffold(
+        backgroundColor: Colors.black,
         body: PageView.builder(
-
           controller: _pageController,
-
-          /// Vertical scroll
           scrollDirection: Axis.vertical,
-
-          /// Page o‘zgarganda
           onPageChanged: _onPageChanged,
-
-          /// Shorts soni
           itemCount: _shorts.length,
-
           itemBuilder: (context, index) {
-
-            /// Hozirgi short
             final short = _shorts[index];
-
-            /// Hozirgi controller
-            final controller =
-            _controllers[index];
+            final controller = _controllers[index];
 
             return Stack(
               fit: StackFit.expand,
-
               children: [
 
-                // ───────────────── VIDEO PLAYER ─────────────────
-
+                // ───── VIDEO PLAYER ─────
                 if (controller != null)
-
                   YoutubePlayerBuilder(
-
                     player: YoutubePlayer(
-
                       controller: controller,
-
-                      /// Progress yashirilgan
-                      showVideoProgressIndicator:
-                      false,
+                      showVideoProgressIndicator: false,
                     ),
-
                     builder: (ctx, player) {
-
                       return SizedBox.expand(
-
                         child: OverflowBox(
                           maxWidth: double.infinity,
                           maxHeight: double.infinity,
-
                           child: SizedBox(
-
-                            /// 9:16 ratio
-                            width:
-                            screenSize.height *
-                                9 /
-                                16,
-
-                            height:
-                            screenSize.height,
-
+                            width: screenSize.height * 9 / 16,
+                            height: screenSize.height,
                             child: player,
                           ),
                         ),
@@ -285,330 +250,21 @@ class _ShortsScreenState
                     },
                   )
 
-                // ───────────────── THUMBNAIL ─────────────────
-
+                // ───── THUMBNAIL (controller yo'q bo'lganda) ─────
                 else
+                  _buildThumbnail(short),
 
-                  short.thumbnail
-                      .startsWith('http')
+                // ───── GRADIENT ─────
+                _buildGradient(),
 
-                      ? Image.network(
+                // ───── TOP BAR ─────
+                _buildTopBar(context, index),
 
-                    short.thumbnail,
+                // ───── RIGHT ACTIONS ─────
+                _buildRightActions(),
 
-                    fit: BoxFit.cover,
-
-                    width: double.infinity,
-                    height: double.infinity,
-
-                    /// Rasm yuklanmasa
-                    errorBuilder:
-                        (_, __, ___) {
-
-                      return Container(
-                        color:
-                        Colors.grey[900],
-                      );
-                    },
-                  )
-
-                      : Container(
-                    color: Colors.grey[900],
-                  ),
-
-                // ───────────────── GRADIENT ─────────────────
-
-                Container(
-                  decoration: const BoxDecoration(
-
-                    gradient: LinearGradient(
-
-                      begin: Alignment.topCenter,
-                      end:
-                      Alignment.bottomCenter,
-
-                      colors: [
-                        Colors.transparent,
-                        Colors.black87,
-                      ],
-
-                      stops: [0.5, 1.0],
-                    ),
-                  ),
-                ),
-
-                // ───────────────── TOP BAR ─────────────────
-
-                Positioned(
-
-                  top:
-                  MediaQuery.of(context)
-                      .padding
-                      .top +
-                      8,
-
-                  left: 16,
-                  right: 16,
-
-                  child: Row(
-                    children: [
-
-                      /// Back button
-                      IconButton(
-
-                        icon: const Icon(
-                          Icons.arrow_back,
-                          color: Colors.white,
-                        ),
-
-                        onPressed: () {
-
-                          /// Video pause
-                          _controllers[
-                          _currentIndex]
-                              ?.pause();
-
-                          Navigator.pop(context);
-                        },
-                      ),
-
-                      /// Shorts icon
-                      const Icon(
-                        Icons.bolt,
-                        color: Colors.white,
-                        size: 22,
-                      ),
-
-                      const SizedBox(width: 4),
-
-                      /// Shorts text
-                      const Text(
-                        'Shorts',
-
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight:
-                          FontWeight.bold,
-                          fontSize: 17,
-                        ),
-                      ),
-
-                      const Spacer(),
-
-                      /// Current index
-                      Text(
-                        '${index + 1}/${_shorts.length}',
-
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 13,
-                        ),
-                      ),
-
-                      /// Search button
-                      IconButton(
-                        icon: const Icon(
-                          Icons.search,
-                          color: Colors.white,
-                        ),
-                        onPressed: () {},
-                      ),
-
-                      /// More button
-                      IconButton(
-                        icon: const Icon(
-                          Icons.more_vert,
-                          color: Colors.white,
-                        ),
-                        onPressed: () {},
-                      ),
-                    ],
-                  ),
-                ),
-
-                // ───────────────── RIGHT ACTIONS ─────────────────
-
-                Positioned(
-                  right: 12,
-                  bottom: 100,
-
-                  child: Column(
-                    children: [
-
-                      /// Like button
-                      _actionButton(
-
-                        icon: _isLiked
-                            ? Icons.thumb_up
-                            : Icons
-                            .thumb_up_outlined,
-
-                        label: '24K',
-
-                        onTap: () {
-
-                          setState(() {
-                            _isLiked = !_isLiked;
-                          });
-                        },
-                      ),
-
-                      const SizedBox(height: 20),
-
-                      /// Dislike button
-                      _actionButton(
-                        icon: Icons
-                            .thumb_down_outlined,
-                        label: 'Dislike',
-                        onTap: () {},
-                      ),
-
-                      const SizedBox(height: 20),
-
-                      /// Comment button
-                      _actionButton(
-                        icon:
-                        Icons.comment_outlined,
-                        label: 'Comment',
-                        onTap: () {},
-                      ),
-
-                      const SizedBox(height: 20),
-
-                      /// Share button
-                      _actionButton(
-                        icon: Icons.reply,
-                        label: 'Share',
-                        onTap: () {},
-                      ),
-
-                      const SizedBox(height: 20),
-
-                      /// More button
-                      _actionButton(
-                        icon: Icons.more_horiz,
-                        label: 'More',
-                        onTap: () {},
-                      ),
-                    ],
-                  ),
-                ),
-
-                // ───────────────── BOTTOM INFO ─────────────────
-
-                Positioned(
-                  left: 16,
-                  right: 70,
-                  bottom: 80,
-
-                  child: Column(
-
-                    crossAxisAlignment:
-                    CrossAxisAlignment.start,
-
-                    children: [
-
-                      Row(
-                        children: [
-
-                          /// Channel avatar
-                          CircleAvatar(
-                            radius: 16,
-                            backgroundColor:
-                            Colors.red,
-
-                            child: Text(
-
-                              short.channel
-                                  .isNotEmpty
-                                  ? short.channel[0]
-                                  : '?',
-
-                              style:
-                              const TextStyle(
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-
-                          const SizedBox(width: 8),
-
-                          /// Channel name
-                          Expanded(
-                            child: Text(
-
-                              short.channel,
-
-                              style:
-                              const TextStyle(
-                                color: Colors.white,
-                                fontWeight:
-                                FontWeight.bold,
-                                fontSize: 13,
-                              ),
-
-                              overflow:
-                              TextOverflow
-                                  .ellipsis,
-                            ),
-                          ),
-
-                          const SizedBox(width: 8),
-
-                          /// Subscribe button
-                          Container(
-
-                            padding:
-                            const EdgeInsets
-                                .symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
-
-                            decoration:
-                            BoxDecoration(
-
-                              border: Border.all(
-                                color: Colors.white,
-                              ),
-
-                              borderRadius:
-                              BorderRadius
-                                  .circular(20),
-                            ),
-
-                            child: const Text(
-                              'Subscribe',
-
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 8),
-
-                      /// Video title
-                      Text(
-
-                        short.title,
-
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 13,
-                        ),
-
-                        maxLines: 2,
-
-                        overflow:
-                        TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
+                // ───── BOTTOM INFO ─────
+                _buildBottomInfo(short),
               ],
             );
           },
@@ -617,39 +273,216 @@ class _ShortsScreenState
     );
   }
 
+  // ───────────────── THUMBNAIL ─────────────────
+
+  Widget _buildThumbnail(VideoModel short) {
+    if (short.thumbnail.startsWith('http')) {
+      return Image.network(
+        short.thumbnail,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+        loadingBuilder: (_, child, progress) {
+          if (progress == null) return child;
+          return Container(
+            color: Colors.grey[900],
+            child: const Center(
+              child: CircularProgressIndicator(
+                color: Colors.white30,
+                strokeWidth: 2,
+              ),
+            ),
+          );
+        },
+        errorBuilder: (_, __, ___) {
+          return Container(color: Colors.grey[900]);
+        },
+      );
+    }
+    return Container(color: Colors.grey[900]);
+  }
+
+  // ───────────────── GRADIENT ─────────────────
+
+  Widget _buildGradient() {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Colors.transparent,
+            Colors.black87,
+          ],
+          stops: [0.5, 1.0],
+        ),
+      ),
+    );
+  }
+
+  // ───────────────── TOP BAR ─────────────────
+
+  Widget _buildTopBar(BuildContext context, int index) {
+    return Positioned(
+      top: MediaQuery.of(context).padding.top + 8,
+      left: 16,
+      right: 16,
+      child: Row(
+        children: [
+          IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            onPressed: () {
+              _controllers[_currentIndex]?.pause();
+              Navigator.pop(context);
+            },
+          ),
+          const Icon(Icons.bolt, color: Colors.white, size: 22),
+          const SizedBox(width: 4),
+          const Text(
+            'Shorts',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 17,
+            ),
+          ),
+          const Spacer(),
+          Text(
+            '${index + 1}/${_shorts.length}',
+            style: const TextStyle(color: Colors.white, fontSize: 13),
+          ),
+          IconButton(
+            icon: const Icon(Icons.search, color: Colors.white),
+            onPressed: () {},
+          ),
+          IconButton(
+            icon: const Icon(Icons.more_vert, color: Colors.white),
+            onPressed: () {},
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ───────────────── RIGHT ACTIONS ─────────────────
+
+  Widget _buildRightActions() {
+    return Positioned(
+      right: 12,
+      bottom: 100,
+      child: Column(
+        children: [
+          _actionButton(
+            icon: _isLiked ? Icons.thumb_up : Icons.thumb_up_outlined,
+            label: '24K',
+            onTap: () => setState(() => _isLiked = !_isLiked),
+          ),
+          const SizedBox(height: 20),
+          _actionButton(
+            icon: Icons.thumb_down_outlined,
+            label: 'Dislike',
+            onTap: () {},
+          ),
+          const SizedBox(height: 20),
+          _actionButton(
+            icon: Icons.comment_outlined,
+            label: 'Comment',
+            onTap: () {},
+          ),
+          const SizedBox(height: 20),
+          _actionButton(
+            icon: Icons.reply,
+            label: 'Share',
+            onTap: () {},
+          ),
+          const SizedBox(height: 20),
+          _actionButton(
+            icon: Icons.more_horiz,
+            label: 'More',
+            onTap: () {},
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ───────────────── BOTTOM INFO ─────────────────
+
+  Widget _buildBottomInfo(VideoModel short) {
+    return Positioned(
+      left: 16,
+      right: 70,
+      bottom: 80,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 16,
+                backgroundColor: Colors.red,
+                child: Text(
+                  short.channel.isNotEmpty ? short.channel[0] : '?',
+                  style: const TextStyle(color: Colors.white),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  short.channel,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.white),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Text(
+                  'Subscribe',
+                  style: TextStyle(color: Colors.white, fontSize: 12),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            short.title,
+            style: const TextStyle(color: Colors.white, fontSize: 13),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+
   // ───────────────── ACTION BUTTON ─────────────────
 
-  /// O‘ng tomondagi action button widget
   Widget _actionButton({
     required IconData icon,
     required String label,
     required VoidCallback onTap,
   }) {
-
     return GestureDetector(
-
       onTap: onTap,
-
       child: Column(
         children: [
-
-          /// Icon
-          Icon(
-            icon,
-            color: Colors.white,
-            size: 28,
-          ),
-
+          Icon(icon, color: Colors.white, size: 28),
           const SizedBox(height: 2),
-
-          /// Text
           Text(
             label,
-
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 11,
-            ),
+            style: const TextStyle(color: Colors.white, fontSize: 11),
           ),
         ],
       ),
